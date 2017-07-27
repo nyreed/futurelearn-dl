@@ -37,7 +37,7 @@ WEEK_NUM = -1 # Select all weeks unless specified on command-line
 #DOWNLOAD_TYPES = [ 'pdf' ]
 #DOWNLOAD_TYPES = [ 'mp4' ]
 #DOWNLOAD_TYPES = [ 'pdf', 'mp4', 'mp3', 'ppt', 'pptx', 'wmv' ]
-DOWNLOAD_TYPES = [ 'html', 'pdf', 'mp4', 'mp3' ]
+DOWNLOAD_TYPES = [ 'html', 'pdf', 'mp4', 'mp3', 'exercises' ]
 for d in range(len(DOWNLOAD_TYPES)):
     DOWNLOAD_TYPES[d] = DOWNLOAD_TYPES[d].lower()
     
@@ -268,7 +268,11 @@ def downloadURLsInPage(course_id, week_id, step_id, week_num, content, DOWNLOAD_
     '''
     POS_MATCH='<a href='
     MEDIA_MATCH=DOWNLOAD_TYPE
-
+    # special case - downloading html exercise page with no file extension
+    if DOWNLOAD_TYPE == 'exercises':
+        POS_MATCH ='<a class=\'link-block\' href='
+        DOWNLOAD_TYPE = '/exercises/' + step_id
+        MEDIA_MATCH = '/exercises/' + step_id
     # except for video
     if DOWNLOAD_TYPE == 'mp4':
         POS_MATCH='<video'
@@ -357,6 +361,9 @@ def downloadURLsInPage(course_id, week_id, step_id, week_num, content, DOWNLOAD_
         # Detect if just "//url" and insert http:
         if url[0:2] == "//":
             url = "https:" + url
+        # Detect if url is '/url' internal link and insert futurelearn domain name (for exercise pages)
+        elif url[0:8] == "/courses":
+            url = "https://www.futurelearn.com" + url
 
         debug(2, "content[{}:{}] => url={}".format(pos, eqpos, url))
         #pause("Got url <<{}>>".format(url))
@@ -375,6 +382,11 @@ def downloadURLsInPage(course_id, week_id, step_id, week_num, content, DOWNLOAD_
         download_dir = OP_DIR + '/' + course_id + '/week' + str(week_num)
 
         if DOWNLOAD_TYPE == 'mp4' or DOWNLOAD_TYPE == 'mp3':
+            debug(4, "MATCHING URL=<<{}>>".format(url))
+            urls.append( url )
+            downloadURLInPage(url, download_dir, DOWNLOAD_TYPE, page_title)
+        # if url is for exercise page, cannot search string for filetype, as there isn't one!
+        elif DOWNLOAD_TYPE == '/exercises/' + step_id:
             debug(4, "MATCHING URL=<<{}>>".format(url))
             urls.append( url )
             downloadURLInPage(url, download_dir, DOWNLOAD_TYPE, page_title)
@@ -439,8 +451,12 @@ def downloadURLInPage(url, download_dir, DOWNLOAD_TYPE, page_title):
         ofile= download_dir + '/' + filename
         downloadURLToFile(url, ofile, DOWNLOAD_TYPE)
     else:
-        # Get the filename from the url after the last slash (where the source filename is):
-        filename = filename +  '_' + url[ url.rfind('/') + 1: ]
+        if DOWNLOAD_TYPE == '/exercises/' + step_id:
+            #append exercise and html filetype for exercise pages.
+            filename = filename + '_exercise.html'
+        else:
+            # Get the filename from the url after the last slash (where the source filename is):
+            filename = filename +  '_' + url[ url.rfind('/') + 1: ]
 
         # Replace any '%20' chars by underscore(_)
         filename = filename.replace('%20', '_')
